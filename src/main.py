@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .models import Preacher, Tag
+from .models import Preacher, Tag, PreacherTag
 from .config import working_month
 from . import const
 
@@ -36,6 +36,27 @@ def list_preacher():
 @app.get("/api/preacher/{id}")
 def get_preacher(id:int):
     return Preacher.get(Preacher.id == id).__data__
+
+
+@app.get("/api/preacher-tag/{id}")
+def get_preacher_tags(id:int):
+    tags = PreacherTag \
+        .select() \
+        .join(Preacher, on=(PreacherTag.preacher == Preacher.id)) \
+        .join(Tag, on=(PreacherTag.tag == Tag.id)) \
+        .where(PreacherTag.preacher.id == id) \
+        .where((PreacherTag.start <= working_month.data) | (PreacherTag.start == None)) \
+        .where((PreacherTag.end >= working_month.data) | (PreacherTag.end == None))
+
+    result_tag = [_.tag.id for _ in tags]
+    result_time = []
+
+    for tag in tags:
+        print(tag.start)
+        print(tag.end)
+        result_time.append(tag.end is not None)
+
+    return zip(result_tag, result_time)
 
 
 @app.get("/api/working-month")

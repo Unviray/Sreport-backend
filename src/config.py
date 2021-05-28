@@ -88,4 +88,4 @@ class MonthBase(object):
 
 
 working_month = MonthBase() - 1
-static_working_month = MonthBase(working_month, False)
+static_working_month = MonthBase(working_month.data, False)

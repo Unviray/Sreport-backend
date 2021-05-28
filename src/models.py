@@ -2,7 +2,7 @@ from peewee import (BooleanField, CharField, DateField, ForeignKeyField,
                     IntegerField, Model, SqliteDatabase)
 
 
-db = SqliteDatabase('database.sqlite')
+db = SqliteDatabase('database.sqlite', pragmas={'foreign_keys': 1})
 
 
 class BaseModel(Model):
@@ -53,6 +53,9 @@ class PreacherTag(BaseModel):
 
     start = DateField('%m %Y', null=True)
     end = DateField('%m %Y', null=True)
+
+    def __str__(self):
+        return f"{str(self.tag)} of {str(self.preacher)}"
 
 
 class Report(BaseModel):
