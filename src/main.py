@@ -1,11 +1,10 @@
 from datetime import date
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from .models import Preacher, Tag, PreacherTag
-from .config import working_month
-from . import const
+from .models import Preacher, Tag, PreacherTag, Report
+from .config import MonthBase, working_month
 
 
 app = FastAPI()
@@ -40,8 +39,7 @@ def get_preacher(id:int):
 
 @app.get("/api/preacher-tag/{id}")
 def get_preacher_tags(id:int):
-    tags = PreacherTag \
-        .select() \
+    tags = PreacherTag.select() \
         .join(Preacher, on=(PreacherTag.preacher == Preacher.id)) \
         .join(Tag, on=(PreacherTag.tag == Tag.id)) \
         .where(PreacherTag.preacher.id == id) \
@@ -52,8 +50,6 @@ def get_preacher_tags(id:int):
     result_time = []
 
     for tag in tags:
-        print(tag.start)
-        print(tag.end)
         result_time.append(tag.end is not None)
 
     return zip(result_tag, result_time)
@@ -75,3 +71,59 @@ def list_tag():
 @app.get("/api/tag/{id}")
 def get_tag(id:int):
     return Tag.get(Tag.id == id).__data__
+
+
+@app.get("/api/service-months")
+def list_service_months(month:int=Query(0, ge=0, le=12), year:int=Query(0, ge=0, le=9999)):
+    if (month == 0) or (year == 0):
+        wm = working_month
+    else:
+        wm = MonthBase({"year": year, "month": month})
+
+    if wm.month in (9, 10, 11, 12):
+        result = [
+            MonthBase({"year": wm.year, "month": 9}) + n for n in range(12)
+        ]
+
+    else:
+        result = [
+            MonthBase({"year": wm.year - 1, "month": 9}) + n for n in range(12)
+        ]
+
+    return list(map(lambda x: x.to_dict(), result))
+
+
+@app.get("/api/report/{preacher_id}")
+def get_report(preacher_id:int, month:int=Query(0, ge=0, le=12), year:int=Query(0, ge=0, le=9999)):
+    if (month == 0) or (year == 0):
+        wm = working_month
+    else:
+        wm = MonthBase({"year": year, "month": month})
+
+    report = Report.select() \
+        .join(Preacher, on=(Report.preacher == Preacher.id)) \
+        .where(Report.preacher == Preacher.get_by_id(preacher_id)) \
+        .where(Report.month == date(wm.year, wm.month, 1))
+
+    if len(report) == 0:
+        return {
+            "month": str(MonthBase({"year": wm.year, "month":wm.month})),
+
+            "publication": 0,
+            "video": 0,
+            "hour": 0,
+            "visit": 0,
+            "study": 0,
+        }
+
+    report = report[0]
+
+    return {
+        "month": str(MonthBase({"year": wm.year, "month":wm.month})),
+
+        "publication": report.publication,
+        "video": report.video,
+        "hour": report.hour,
+        "visit": report.visit,
+        "study": report.study,
+    }

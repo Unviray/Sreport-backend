@@ -18,7 +18,10 @@ class MonthBase(object):
         self.mutable = mutable
 
         if obj is not None:
-            self.data = obj
+            if isinstance(obj, date):
+                self.data = obj
+            elif isinstance(obj, dict):
+                self.data = date(obj["year"], obj["month"], 1)
         else:
             self.data = date.today()
 
@@ -44,14 +47,21 @@ class MonthBase(object):
     def __repr__(self):
         return f'<MonthBase month: {str(self)}>'
 
+    def to_dict(self):
+        return {
+            "month": self.month,
+            "year": self.year,
+        }
+
     def __sub__(self, n):
         """
         Use to jump {n} month behind
         """
 
+        y = self.data.year
+        m = self.data.month
+
         if self.mutable:
-            y = self.data.year
-            m = self.data.month
 
             if n > 0:
                 self.data = date(
@@ -63,16 +73,27 @@ class MonthBase(object):
 
             return self
         else:
-            raise ArithmeticError("I'm immutable")
+            new_date = date(year=y, month=m, day=1)
+
+            while n > 0:
+                new_date = date(
+                    year=new_date.year - 1 if new_date.month == 1 else new_date.year,  # last year if today is jan
+                    month=new_date.month - 1 if new_date.month > 1 else 12,  # avoid month 0
+                    day=1, )  # day 1 is ignored
+
+                n -= 1
+
+            return MonthBase(new_date, mutable=False)
 
     def __add__(self, n):
         """
         Use to jump {n} month forward
         """
 
+        y = self.data.year
+        m = self.data.month
+
         if self.mutable:
-            y = self.data.year
-            m = self.data.month
 
             if n > 0:
                 self.data = date(
@@ -84,8 +105,18 @@ class MonthBase(object):
 
             return self
         else:
-            raise ArithmeticError("I'm immutable")
+            new_date = date(year=y, month=m, day=1)
+
+            while n > 0:
+                new_date = date(
+                    year=new_date.year + 1 if new_date.month == 12 else new_date.year,  # last year if today is jan
+                    month=new_date.month + 1 if new_date.month < 12 else 1,  # avoid month 0
+                    day=1, )  # day 1 is ignored
+
+                n -= 1
+
+            return MonthBase(new_date, mutable=False)
 
 
 working_month = MonthBase() - 1
-static_working_month = MonthBase(working_month.data, False)
+static_working_month = MonthBase(working_month.data, mutable=False)
