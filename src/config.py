@@ -36,9 +36,11 @@ class MonthBase(object):
     def __str__(self):
         # - 1 because index start with 0
         m = const.month_list[self.data.month - 1]
+        sm = const.short_month_list[self.data.month - 1]
         y = self.data.year
 
         return self.FORMAT.format(
+            short_month=sm.title(),
             month=m.title(),
             short_year=str(y)[2:],
             year=y

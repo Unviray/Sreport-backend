@@ -146,3 +146,19 @@ def get_report(preacher_id:int, wm:MonthBase=Depends(in_month)):
         "visit": report.visit,
         "study": report.study,
     }
+
+
+@app.get("/api/service-hour/{preacher_id}")
+def service_hour(preacher_id:int, wm:MonthBase=Depends(in_month)):
+    service_months = list_service_months(wm)
+
+    def get_hour_value(month):
+        return get_report(preacher_id, MonthBase(month))["hour"]
+
+    def get_hour_label(month):
+        mb = MonthBase(month)
+        mb.FORMAT = "{short_month} {short_year}"
+
+        return str(mb)
+
+    return {get_hour_label(month): get_hour_value(month) for month in service_months}

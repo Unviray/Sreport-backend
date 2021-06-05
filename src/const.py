@@ -11,3 +11,18 @@ month_list = (
     'oktobra',
     'novambra',
     'desambra', )
+
+
+short_month_list = (
+    'jan',
+    'feb',
+    'mar',
+    'apr',
+    'may',
+    'jon',
+    'jol',
+    'aog',
+    'sep',
+    'okt',
+    'nov',
+    'des', )
