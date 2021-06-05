@@ -1,9 +1,9 @@
 from datetime import date
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
-from .models import Preacher, Tag, PreacherTag, Report
+from .models import Tag, Preacher, PreacherTag, Report, ReportTag
 from .config import MonthBase, working_month
 
 
@@ -22,6 +22,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def in_month(month:int=Query(0, ge=0, le=12), year:int=Query(0, ge=0, le=9999)):
+    if (month == 0) or (year == 0):
+        return working_month
+    else:
+        return MonthBase({"year": year, "month": month})
 
 
 @app.get("/api/list-preacher")
@@ -55,6 +62,18 @@ def get_preacher_tags(id:int):
     return zip(result_tag, result_time)
 
 
+@app.get("/api/report-tag/{preacher_id}")
+def get_report_tags(preacher_id:int, wm:MonthBase=Depends(in_month)):
+    report_id = get_report(preacher_id, wm)["id"]
+
+    tags = ReportTag.select() \
+        .join(Report, on=(ReportTag.report == Report.id)) \
+        .join(Tag, on=(ReportTag.tag == Tag.id)) \
+        .where(ReportTag.report.id == report_id)
+
+    return [_.tag.id for _ in tags]
+
+
 @app.get("/api/working-month")
 def get_working_month():
     return str(working_month)
@@ -73,13 +92,16 @@ def get_tag(id:int):
     return Tag.get(Tag.id == id).__data__
 
 
-@app.get("/api/service-months")
-def list_service_months(month:int=Query(0, ge=0, le=12), year:int=Query(0, ge=0, le=9999)):
-    if (month == 0) or (year == 0):
-        wm = working_month
+@app.get("/api/year-service")
+def year_service(wm:MonthBase=Depends(in_month)):
+    if wm.month in (9, 10, 11, 12):
+        return wm.year + 1
     else:
-        wm = MonthBase({"year": year, "month": month})
+        return wm.year
 
+
+@app.get("/api/service-months")
+def list_service_months(wm:MonthBase=Depends(in_month)):
     if wm.month in (9, 10, 11, 12):
         result = [
             MonthBase({"year": wm.year, "month": 9}) + n for n in range(12)
@@ -94,12 +116,7 @@ def list_service_months(month:int=Query(0, ge=0, le=12), year:int=Query(0, ge=0,
 
 
 @app.get("/api/report/{preacher_id}")
-def get_report(preacher_id:int, month:int=Query(0, ge=0, le=12), year:int=Query(0, ge=0, le=9999)):
-    if (month == 0) or (year == 0):
-        wm = working_month
-    else:
-        wm = MonthBase({"year": year, "month": month})
-
+def get_report(preacher_id:int, wm:MonthBase=Depends(in_month)):
     report = Report.select() \
         .join(Preacher, on=(Report.preacher == Preacher.id)) \
         .where(Report.preacher == Preacher.get_by_id(preacher_id)) \
@@ -107,6 +124,7 @@ def get_report(preacher_id:int, month:int=Query(0, ge=0, le=12), year:int=Query(
 
     if len(report) == 0:
         return {
+            "id": 0,
             "month": str(MonthBase({"year": wm.year, "month":wm.month})),
 
             "publication": 0,
@@ -119,6 +137,7 @@ def get_report(preacher_id:int, month:int=Query(0, ge=0, le=12), year:int=Query(
     report = report[0]
 
     return {
+        "id": report.id,
         "month": str(MonthBase({"year": wm.year, "month":wm.month})),
 
         "publication": report.publication,

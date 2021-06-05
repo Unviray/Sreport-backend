@@ -84,6 +84,9 @@ class ReportTag(BaseModel):
     report = ForeignKeyField(Report, backref="tags")
     tag = ForeignKeyField(Tag, backref="reports")
 
+    def __str__(self):
+        return f"{self.tag} of {self.report}"
+
 
 db.create_tables([
     Group,
