@@ -18,7 +18,7 @@ short_month_list = (
     'feb',
     'mar',
     'apr',
-    'may',
+    'mey',
     'jon',
     'jol',
     'aog',

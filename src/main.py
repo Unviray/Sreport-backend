@@ -148,6 +148,11 @@ def get_report(preacher_id:int, wm:MonthBase=Depends(in_month)):
     }
 
 
+@app.get("/api/returned/{preacher_id}")
+def returned(preacher_id:int, wm:MonthBase=Depends(in_month)):
+    return get_report(preacher_id, wm)["hour"] != 0
+
+
 @app.get("/api/service-hour/{preacher_id}")
 def service_hour(preacher_id:int, wm:MonthBase=Depends(in_month)):
     service_months = list_service_months(wm)
