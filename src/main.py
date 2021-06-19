@@ -157,13 +157,13 @@ def returned(preacher_id:int, wm:MonthBase=Depends(in_month)):
 def service_hour(preacher_id:int, wm:MonthBase=Depends(in_month)):
     service_months = list_service_months(wm)
 
-    def get_hour_value(month):
-        return get_report(preacher_id, MonthBase(month))["hour"]
-
     def get_hour_label(month):
         mb = MonthBase(month)
         mb.FORMAT = "{short_month} {short_year}"
 
         return str(mb)
+
+    def get_hour_value(month):
+        return get_report(preacher_id, MonthBase(month))["hour"]
 
     return {get_hour_label(month): get_hour_value(month) for month in service_months}
