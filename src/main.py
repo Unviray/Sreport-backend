@@ -3,6 +3,8 @@ from datetime import date
 from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
+from slugify import slugify
+
 from .models import Tag, Preacher, PreacherTag, Report, ReportTag
 from .config import MonthBase, working_month
 
@@ -32,8 +34,16 @@ def in_month(month:int=Query(0, ge=0, le=12), year:int=Query(0, ge=0, le=9999)):
 
 
 @app.get("/api/list-preacher")
-def list_preacher():
-    result = [_.id for _ in Preacher.select(Preacher.id)]
+def list_preacher(search:str=""):
+    preachers = Preacher.select(Preacher.id)
+    if search:
+        preachers = preachers.where(
+            Preacher.firstname.contains(search) |
+            Preacher.lastname.contains(search) |
+            Preacher.display_name.contains(search)
+        )
+
+    result = [_.id for _ in preachers]
     result.sort()
 
     return result
@@ -167,3 +177,60 @@ def service_hour(preacher_id:int, wm:MonthBase=Depends(in_month)):
         return get_report(preacher_id, MonthBase(month))["hour"]
 
     return {get_hour_label(month): get_hour_value(month) for month in service_months}
+
+
+@app.get("/api/total-month/{selected}")
+def total_month(selected, wm:MonthBase=Depends(in_month)):
+    # report = Report.select() \
+    #     .join(ReportTag, on=(ReportTag.report == Report.id)) \
+    #     .join(Tag, on=(ReportTag.tag == Tag.id)) \
+    #     .where(slugify(ReportTag.tag.name) == selected)
+    reports = Report.select() \
+        .where(Report.month == date(wm.year, wm.month, 1))
+
+    def filterer(report):
+        if selected == "mpisavalalana-maharitra":
+            for report_tag in report.tags:
+                if slugify(report_tag.tag.name) == selected:
+                    return True
+            return False
+
+        if selected == "mpisavalalana-mpanampy":
+            for report_tag in report.tags:
+                if slugify(report_tag.tag.name) == selected:
+                    return True
+            return False
+
+        if selected == "mpitory":
+            for report_tag in report.tags:
+                if slugify(report_tag.tag.name) in ["mpisavalalana-maharitra", "mpisavalalana-mpanampy"]:
+                    return False
+            return True
+
+        if selected == "total":
+            return True
+
+
+    data = {
+        "number": 0,
+
+        "publication": 0,
+        "video": 0,
+        "hour": 0,
+        "visit": 0,
+        "study": 0,
+    }
+
+
+    reports = list(filter(filterer, reports))
+
+    for report in reports:
+        data["number"] += 1
+
+        data["publication"] += report.publication
+        data["video"] += report.video
+        data["hour"] += report.hour
+        data["visit"] += report.visit
+        data["study"] += report.study
+
+    return data
