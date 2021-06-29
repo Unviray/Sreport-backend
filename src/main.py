@@ -74,12 +74,31 @@ def get_preacher_tags(id:int):
 
 @app.get("/api/report-tag/{preacher_id}")
 def get_report_tags(preacher_id:int, wm:MonthBase=Depends(in_month)):
+    """
+    :param preacher_id: preacher id. 0 for all
+    """
+
     report_id = get_report(preacher_id, wm)["id"]
 
     tags = ReportTag.select() \
         .join(Report, on=(ReportTag.report == Report.id)) \
-        .join(Tag, on=(ReportTag.tag == Tag.id)) \
-        .where(ReportTag.report.id == report_id)
+        .join(Tag, on=(ReportTag.tag == Tag.id))
+
+    if isinstance(report_id, int):
+        tags = tags.where(ReportTag.report.id == report_id)
+
+    else:  # maybe a list
+        def where_or(rep_id, last=None):
+            if last is None:
+                return (ReportTag.report.id == rep_id)
+            else:
+                return (last | (ReportTag.report.id == rep_id))
+
+        query = None
+        for rep_id in report_id:
+            query = where_or(rep_id, query)
+
+        tags = tags.where(query)
 
     return [_.tag.id for _ in tags]
 
@@ -127,12 +146,18 @@ def list_service_months(wm:MonthBase=Depends(in_month)):
 
 @app.get("/api/report/{preacher_id}")
 def get_report(preacher_id:int, wm:MonthBase=Depends(in_month)):
-    report = Report.select() \
-        .join(Preacher, on=(Report.preacher == Preacher.id)) \
-        .where(Report.preacher == Preacher.get_by_id(preacher_id)) \
-        .where(Report.month == date(wm.year, wm.month, 1))
+    """
+    :param preacher_id: preacher id. 0 for all
+    """
 
-    if len(report) == 0:
+    reports = Report.select() \
+        .join(Preacher, on=(Report.preacher == Preacher.id)) \
+        .where(Report.month == date(wm.year, wm.month, 1)) \
+
+    if preacher_id != 0:
+        reports = reports.where(Report.preacher == Preacher.get_by_id(preacher_id))
+
+    if len(reports) == 0:
         return {
             "id": 0,
             "month": str(MonthBase({"year": wm.year, "month":wm.month})),
@@ -144,18 +169,41 @@ def get_report(preacher_id:int, wm:MonthBase=Depends(in_month)):
             "study": 0,
         }
 
-    report = report[0]
+    if preacher_id != 0:
+        report = reports[0]
 
-    return {
-        "id": report.id,
-        "month": str(MonthBase({"year": wm.year, "month":wm.month})),
+        return {
+            "id": report.id,
+            "month": str(MonthBase({"year": wm.year, "month":wm.month})),
 
-        "publication": report.publication,
-        "video": report.video,
-        "hour": report.hour,
-        "visit": report.visit,
-        "study": report.study,
-    }
+            "publication": report.publication,
+            "video": report.video,
+            "hour": report.hour,
+            "visit": report.visit,
+            "study": report.study,
+        }
+    else:
+        data = {
+            "id": [],
+            "month": str(MonthBase({"year": wm.year, "month":wm.month})),
+
+            "publication": 0,
+            "video": 0,
+            "hour": 0,
+            "visit": 0,
+            "study": 0,
+        }
+
+        for report in reports:
+            data["id"].append(report.id)
+
+            data["publication"] += report.publication
+            data["video"] += report.video
+            data["hour"] += report.hour
+            data["visit"] += report.visit
+            data["study"] += report.study
+
+        return data
 
 
 @app.get("/api/returned/{preacher_id}")
@@ -165,6 +213,10 @@ def returned(preacher_id:int, wm:MonthBase=Depends(in_month)):
 
 @app.get("/api/service-hour/{preacher_id}")
 def service_hour(preacher_id:int, wm:MonthBase=Depends(in_month)):
+    """
+    :param preacher_id: preacher id. 0 for all
+    """
+
     service_months = list_service_months(wm)
 
     def get_hour_label(month):
