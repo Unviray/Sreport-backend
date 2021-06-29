@@ -1,12 +1,14 @@
 from datetime import date
+from functools import lru_cache
 
 from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from slugify import slugify
 
-from .models import Tag, Preacher, PreacherTag, Report, ReportTag
+from .utils import Cache, update_cache
 from .config import MonthBase, working_month
+from .models import Tag, Preacher, PreacherTag, Report, ReportTag
 
 
 app = FastAPI()
@@ -34,6 +36,7 @@ def in_month(month:int=Query(0, ge=0, le=12), year:int=Query(0, ge=0, le=9999)):
 
 
 @app.get("/api/list-preacher")
+@Cache(deps=[Preacher])
 def list_preacher(search:str=""):
     preachers = Preacher.select(Preacher.id)
     if search:
@@ -50,11 +53,13 @@ def list_preacher(search:str=""):
 
 
 @app.get("/api/preacher/{id}")
+@Cache(deps=[Preacher])
 def get_preacher(id:int):
     return Preacher.get(Preacher.id == id).__data__
 
 
 @app.get("/api/preacher-tag/{id}")
+@Cache(deps=[Preacher, Tag, PreacherTag])
 def get_preacher_tags(id:int):
     tags = PreacherTag.select() \
         .join(Preacher, on=(PreacherTag.preacher == Preacher.id)) \
@@ -72,79 +77,8 @@ def get_preacher_tags(id:int):
     return zip(result_tag, result_time)
 
 
-@app.get("/api/report-tag/{preacher_id}")
-def get_report_tags(preacher_id:int, wm:MonthBase=Depends(in_month)):
-    """
-    :param preacher_id: preacher id. 0 for all
-    """
-
-    report_id = get_report(preacher_id, wm)["id"]
-
-    tags = ReportTag.select() \
-        .join(Report, on=(ReportTag.report == Report.id)) \
-        .join(Tag, on=(ReportTag.tag == Tag.id))
-
-    if isinstance(report_id, int):
-        tags = tags.where(ReportTag.report.id == report_id)
-
-    else:  # maybe a list
-        def where_or(rep_id, last=None):
-            if last is None:
-                return (ReportTag.report.id == rep_id)
-            else:
-                return (last | (ReportTag.report.id == rep_id))
-
-        query = None
-        for rep_id in report_id:
-            query = where_or(rep_id, query)
-
-        tags = tags.where(query)
-
-    return [_.tag.id for _ in tags]
-
-
-@app.get("/api/working-month")
-def get_working_month():
-    return str(working_month)
-
-
-@app.get("/api/list-tag")
-def list_tag():
-    result = [_.id for _ in Tag.select(Tag.id)]
-    result.sort()
-
-    return result
-
-
-@app.get("/api/tag/{id}")
-def get_tag(id:int):
-    return Tag.get(Tag.id == id).__data__
-
-
-@app.get("/api/year-service")
-def year_service(wm:MonthBase=Depends(in_month)):
-    if wm.month in (9, 10, 11, 12):
-        return wm.year + 1
-    else:
-        return wm.year
-
-
-@app.get("/api/service-months")
-def list_service_months(wm:MonthBase=Depends(in_month)):
-    if wm.month in (9, 10, 11, 12):
-        result = [
-            MonthBase({"year": wm.year, "month": 9}) + n for n in range(12)
-        ]
-
-    else:
-        result = [
-            MonthBase({"year": wm.year - 1, "month": 9}) + n for n in range(12)
-        ]
-
-    return list(map(lambda x: x.to_dict(), result))
-
-
 @app.get("/api/report/{preacher_id}")
+@Cache(deps=[Report, Preacher, MonthBase])
 def get_report(preacher_id:int, wm:MonthBase=Depends(in_month)):
     """
     :param preacher_id: preacher id. 0 for all
@@ -206,12 +140,92 @@ def get_report(preacher_id:int, wm:MonthBase=Depends(in_month)):
         return data
 
 
+@app.get("/api/report-tag/{preacher_id}")
+@Cache(deps=([Report, Tag, ReportTag, MonthBase] + get_report.cache.deps))
+def get_report_tags(preacher_id:int, wm:MonthBase=Depends(in_month)):
+    """
+    :param preacher_id: preacher id. 0 for all
+    """
+
+    report_id = get_report(preacher_id, wm)["id"]
+
+    tags = ReportTag.select() \
+        .join(Report, on=(ReportTag.report == Report.id)) \
+        .join(Tag, on=(ReportTag.tag == Tag.id))
+
+    if isinstance(report_id, int):
+        tags = tags.where(ReportTag.report.id == report_id)
+
+    else:  # maybe a list
+        def where_or(rep_id, last=None):
+            if last is None:
+                return (ReportTag.report.id == rep_id)
+            else:
+                return (last | (ReportTag.report.id == rep_id))
+
+        query = None
+        for rep_id in report_id:
+            query = where_or(rep_id, query)
+
+        tags = tags.where(query)
+
+    return [_.tag.id for _ in tags]
+
+
+@app.get("/api/working-month")
+@Cache(deps=[MonthBase])
+def get_working_month():
+    return str(working_month)
+
+
+@app.get("/api/list-tag")
+@Cache(deps=[Tag])
+def list_tag():
+    result = [_.id for _ in Tag.select(Tag.id)]
+    result.sort()
+
+    return result
+
+
+@app.get("/api/tag/{id}")
+@Cache(deps=[Tag])
+def get_tag(id:int):
+    return Tag.get(Tag.id == id).__data__
+
+
+@app.get("/api/year-service")
+@Cache(deps=[MonthBase])
+def year_service(wm:MonthBase=Depends(in_month)):
+    if wm.month in (9, 10, 11, 12):
+        return wm.year + 1
+    else:
+        return wm.year
+
+
+@app.get("/api/service-months")
+@Cache(deps=[MonthBase])
+def list_service_months(wm:MonthBase=Depends(in_month)):
+    if wm.month in (9, 10, 11, 12):
+        result = [
+            MonthBase({"year": wm.year, "month": 9}) + n for n in range(12)
+        ]
+
+    else:
+        result = [
+            MonthBase({"year": wm.year - 1, "month": 9}) + n for n in range(12)
+        ]
+
+    return list(map(lambda x: x.to_dict(), result))
+
+
 @app.get("/api/returned/{preacher_id}")
+@Cache(deps=[MonthBase] + get_report.cache.deps)
 def returned(preacher_id:int, wm:MonthBase=Depends(in_month)):
     return get_report(preacher_id, wm)["hour"] != 0
 
 
 @app.get("/api/service-hour/{preacher_id}")
+@Cache(deps=[MonthBase] + list_service_months.cache.deps + get_report.cache.deps)
 def service_hour(preacher_id:int, wm:MonthBase=Depends(in_month)):
     """
     :param preacher_id: preacher id. 0 for all
@@ -232,6 +246,7 @@ def service_hour(preacher_id:int, wm:MonthBase=Depends(in_month)):
 
 
 @app.get("/api/total-month/{selected}")
+@Cache(deps=[Report, ReportTag, Tag, MonthBase])
 def total_month(selected, wm:MonthBase=Depends(in_month)):
     # report = Report.select() \
     #     .join(ReportTag, on=(ReportTag.report == Report.id)) \
