@@ -74,7 +74,7 @@ def get_preacher_tags(id:int):
     for tag in tags:
         result_time.append(tag.end is not None)
 
-    return zip(result_tag, result_time)
+    return dict(zip(result_tag, result_time))
 
 
 @app.get("/api/report/{preacher_id}")
