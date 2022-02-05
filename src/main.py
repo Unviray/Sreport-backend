@@ -8,7 +8,15 @@ from slugify import slugify
 
 from .utils import Cache, update_cache
 from .config import MonthBase, working_month
-from .models import Tag, Preacher, PreacherTag, Report, ReportTag
+from .models import (
+    Tag,
+    Preacher,
+    PreacherTag,
+    Report,
+    ReportTag,
+    PostReport,
+    PostMonth
+)
 
 
 app = FastAPI()
@@ -94,7 +102,7 @@ def get_report(preacher_id:int, wm:MonthBase=Depends(in_month)):
     if len(reports) == 0:
         return {
             "id": 0,
-            "month": str(MonthBase({"year": wm.year, "month":wm.month})),
+            "month": wm.to_dict(),
 
             "publication": 0,
             "video": 0,
@@ -108,7 +116,7 @@ def get_report(preacher_id:int, wm:MonthBase=Depends(in_month)):
 
         return {
             "id": report.id,
-            "month": str(MonthBase({"year": wm.year, "month":wm.month})),
+            "month": wm.to_dict(),
 
             "publication": report.publication,
             "video": report.video,
@@ -119,7 +127,7 @@ def get_report(preacher_id:int, wm:MonthBase=Depends(in_month)):
     else:
         data = {
             "id": [],
-            "month": str(MonthBase({"year": wm.year, "month":wm.month})),
+            "month": wm.to_dict(),
 
             "publication": 0,
             "video": 0,
@@ -138,6 +146,49 @@ def get_report(preacher_id:int, wm:MonthBase=Depends(in_month)):
             data["study"] += report.study
 
         return data
+
+
+@app.post("/api/report/{preacher_id}")
+@Cache(deps=get_report.cache.deps, updates=[Report, ReportTag, Tag])
+def set_report(preacher_id:int, post_report:PostReport, wm:MonthBase=Depends(in_month)):
+    report_id = get_report(preacher_id, wm)["id"]
+
+    if report_id != 0:
+        report = Report.get(Report.id == report_id)
+
+        report.publication = post_report.publication
+        report.video = post_report.video
+        report.hour = post_report.hour
+        report.visit = post_report.visit
+        report.study = post_report.study
+        report.note = post_report.note
+
+        report.save()
+    else:
+        report = Report.create(
+            preacher=Preacher.get(Preacher.id == preacher_id),
+            month=wm.data,
+
+            publication=post_report.publication,
+            video=post_report.video,
+            hour=post_report.hour,
+            visit=post_report.visit,
+            study=post_report.study,
+
+            note=post_report.note,
+        )
+
+    return {
+        "id": report.id,
+        "month": wm.to_dict(),
+
+        "publication": report.publication,
+        "video": report.video,
+        "hour": report.hour,
+        "visit": report.visit,
+        "study": report.study,
+        "note": report.note
+    }
 
 
 @app.get("/api/report-tag/{preacher_id}")
@@ -175,7 +226,13 @@ def get_report_tags(preacher_id:int, wm:MonthBase=Depends(in_month)):
 @app.get("/api/working-month")
 @Cache(deps=[MonthBase])
 def get_working_month():
-    return str(working_month)
+    return working_month.to_dict()
+
+
+@app.post("/api/working-month")
+@Cache(deps=[MonthBase], updates=[MonthBase])
+def set_working_month(post_month:PostMonth):
+    working_month.__init__(post_month)
 
 
 @app.get("/api/list-tag")
@@ -187,10 +244,14 @@ def list_tag():
     return result
 
 
-@app.get("/api/tag/{id}")
+@app.get("/api/tag/{ids}")
 @Cache(deps=[Tag])
-def get_tag(id:int):
-    return Tag.get(Tag.id == id).__data__
+def get_tag(ids:str):
+    result = []
+    for _id in ids.split(","):
+        result.append(Tag.get(Tag.id == _id).__data__)
+
+    return result
 
 
 @app.get("/api/year-service")
@@ -245,9 +306,9 @@ def service_hour(preacher_id:int, wm:MonthBase=Depends(in_month)):
     return {get_hour_label(month): get_hour_value(month) for month in service_months}
 
 
-@app.get("/api/total-month/{selected}")
+@app.get("/api/total-month")
 @Cache(deps=[Report, ReportTag, Tag, MonthBase])
-def total_month(selected, wm:MonthBase=Depends(in_month)):
+def total_month(with_tag:str="", without_tag:str="", wm:MonthBase=Depends(in_month)):
     # report = Report.select() \
     #     .join(ReportTag, on=(ReportTag.report == Report.id)) \
     #     .join(Tag, on=(ReportTag.tag == Tag.id)) \
@@ -256,27 +317,18 @@ def total_month(selected, wm:MonthBase=Depends(in_month)):
         .where(Report.month == date(wm.year, wm.month, 1))
 
     def filterer(report):
-        if selected == "mpisavalalana-maharitra":
+        if with_tag:
             for report_tag in report.tags:
-                if slugify(report_tag.tag.name) == selected:
+                if report_tag.tag.id in [int(tag_id) for tag_id in with_tag.split(",")]:
                     return True
             return False
-
-        if selected == "mpisavalalana-mpanampy":
+        if without_tag:
             for report_tag in report.tags:
-                if slugify(report_tag.tag.name) == selected:
-                    return True
-            return False
-
-        if selected == "mpitory":
-            for report_tag in report.tags:
-                if slugify(report_tag.tag.name) in ["mpisavalalana-maharitra", "mpisavalalana-mpanampy"]:
+                if report_tag.tag.id in [int(tag_id) for tag_id in without_tag.split(",")]:
                     return False
             return True
 
-        if selected == "total":
-            return True
-
+        return True
 
     data = {
         "number": 0,
@@ -287,7 +339,6 @@ def total_month(selected, wm:MonthBase=Depends(in_month)):
         "visit": 0,
         "study": 0,
     }
-
 
     reports = list(filter(filterer, reports))
 

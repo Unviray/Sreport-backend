@@ -32,41 +32,41 @@ month_name = {
     'mar': 'mar',
     'apr': 'apr',
     'may': 'may',
-    'jun': 'jon',
-    'jul': 'jol',
-    'aug': 'aog',
+    'jun': 'jun',
+    'jul': 'jul',
+    'aug': 'aug',
     'sep': 'sep',
-    'oct': 'okt',
+    'oct': 'oct',
     'nov': 'nov',
-    'dec': 'des',
+    'dec': 'dec',
 
     # long_month
-    'january': 'janoary',
-    'february': 'febroary',
-    'march': 'martsa',
-    'april': 'aprily',
+    'january': 'january',
+    'february': 'february',
+    'march': 'march',
+    'april': 'april',
     'may': 'may',
-    'june': 'jona',
-    'july': 'jolay',
-    'august': 'aogositra',
-    'september': 'septambra',
-    'october': 'oktobra',
-    'november': 'novambra',
-    'december': 'desambra', }
+    'june': 'june',
+    'july': 'july',
+    'august': 'august',
+    'september': 'september',
+    'october': 'october',
+    'november': 'november',
+    'december': 'december', }
 
 month_short2long = {
-    'jan': 'janoary',
-    'feb': 'febroary',
-    'mar': 'martsa',
-    'apr': 'aprily',
+    'jan': 'january',
+    'feb': 'february',
+    'mar': 'march',
+    'apr': 'april',
     'may': 'may',
-    'jun': 'jona',
-    'jul': 'jolay',
-    'aug': 'aogositra',
-    'sep': 'septambra',
-    'oct': 'oktobra',
-    'nov': 'novambra',
-    'dec': 'desambra', }
+    'jun': 'june',
+    'jul': 'july',
+    'aug': 'august',
+    'sep': 'september',
+    'oct': 'october',
+    'nov': 'november',
+    'dec': 'december', }
 
 
 class MonthBase(object):
@@ -192,8 +192,6 @@ class MonthBase(object):
             return MonthBase(obj)
         else:
             return MonthBase(self.data)
-
-
 
 
 

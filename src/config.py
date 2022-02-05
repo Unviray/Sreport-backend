@@ -1,7 +1,6 @@
 from datetime import date
 
-
-from . import const
+import calendar
 
 
 class MonthBase(object):
@@ -34,9 +33,8 @@ class MonthBase(object):
         return self.data.year
 
     def __str__(self):
-        # - 1 because index start with 0
-        m = const.month_list[self.data.month - 1]
-        sm = const.short_month_list[self.data.month - 1]
+        m = calendar.month_name[self.data.month]
+        sm = calendar.month_abbr[self.data.month]
         y = self.data.year
 
         return self.FORMAT.format(

@@ -9,8 +9,10 @@ class Cache:
     Like LRU_Cache but can be updated
     """
 
-    def __init__(self, deps:list):
+    def __init__(self, deps:list, updates:list=[]):
         self.deps = deps
+        self.updates = updates
+
         CACHED_LIST.append(self)
 
     def __call__(self, func):
@@ -21,7 +23,9 @@ class Cache:
         @wraps(func)
         @lru_cache()
         def wrapped(*args, **kwargs):
-            return func(*args, **kwargs)
+            result = func(*args, **kwargs)
+            update_cache(self.updates)
+            return result
 
         wrapped.cache = self
 

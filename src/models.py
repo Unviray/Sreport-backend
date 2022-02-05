@@ -1,6 +1,8 @@
 from peewee import (BooleanField, CharField, DateField, ForeignKeyField,
                     IntegerField, Model, SqliteDatabase)
 
+from pydantic import BaseModel as bm
+
 
 db = SqliteDatabase('database.sqlite', pragmas={'foreign_keys': 1})
 
@@ -8,6 +10,11 @@ db = SqliteDatabase('database.sqlite', pragmas={'foreign_keys': 1})
 class BaseModel(Model):
     class Meta:
         database = db
+
+
+class PostModel(bm):
+    def __hash__(self) -> int:
+        return hash((type(self),) + tuple(self.__dict__.values()))
 
 
 class Group(BaseModel):
@@ -96,3 +103,17 @@ db.create_tables([
     Report,
     ReportTag
 ])
+
+
+class PostReport(PostModel):
+    publication: int
+    video: int
+    hour: int
+    visit: int
+    study: int
+
+    note: str
+
+class PostMonth(PostModel):
+    month: int
+    year: int
