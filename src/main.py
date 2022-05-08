@@ -1,5 +1,6 @@
 from datetime import date
 from functools import lru_cache
+from typing import List
 
 from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slugify import slugify
 
 from .utils import Cache, update_cache
-from .config import MonthBase, working_month
+from .config import MonthBase, working_month, static_working_month
 from .models import (
     Tag,
     Preacher,
@@ -223,6 +224,24 @@ def get_report_tags(preacher_id:int, wm:MonthBase=Depends(in_month)):
     return [_.tag.id for _ in tags]
 
 
+@app.post("/api/report-tag/{report_id}")
+@Cache(deps=([Report, Tag, ReportTag]), updates=[ReportTag, Report])
+def set_report_tags(report_id:int, tags:List[int]):
+    """
+    :param preacher_id: preacher id. 0 for all
+    """
+
+    report = Report.get(Report.id == report_id)
+
+    for tag_id in tags:
+        ReportTag.create(
+            report=report,
+            tag=Tag.get(Tag.id == tag_id),
+        )
+
+    return get_report_tags(report.preacher.id, report.month)
+
+
 @app.get("/api/working-month")
 @Cache(deps=[MonthBase])
 def get_working_month():
@@ -231,8 +250,10 @@ def get_working_month():
 
 @app.post("/api/working-month")
 @Cache(deps=[MonthBase], updates=[MonthBase])
-def set_working_month(post_month:PostMonth):
+def set_working_month(post_month:PostMonth=static_working_month.to_dict()):
     working_month.__init__(post_month)
+
+    return post_month
 
 
 @app.get("/api/list-tag")

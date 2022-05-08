@@ -1,6 +1,6 @@
+from typing import Optional
 from peewee import (BooleanField, CharField, DateField, ForeignKeyField,
                     IntegerField, Model, SqliteDatabase)
-
 from pydantic import BaseModel as bm
 
 
@@ -106,13 +106,13 @@ db.create_tables([
 
 
 class PostReport(PostModel):
-    publication: int
-    video: int
-    hour: int
-    visit: int
-    study: int
+    publication: Optional[int] = 0
+    video: Optional[int] = 0
+    hour: Optional[int] = 0
+    visit: Optional[int] = 0
+    study: Optional[int] = 0
 
-    note: str
+    note: Optional[str] = ""
 
 class PostMonth(PostModel):
     month: int
